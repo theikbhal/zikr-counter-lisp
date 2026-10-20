@@ -1,0 +1,18 @@
+v1
+1) counte local storage
+
+---
+
+v2
+single counter sqlite
+---
+
+v3
+
+multi counter sqlite
+layout grid, linear veritical, horizontal
+
+counter, name, edit, target, reset, plus
+
+---
+
