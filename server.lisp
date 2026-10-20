@@ -1,9 +1,53 @@
 (ql:quickload :hunchentoot)
 
+(defparameter *db-path*
+  "/Users/ikbhal/Desktop/lisp_space/zikr-counter/zikr.db")
+
 (defparameter *web-server*
   (make-instance 'hunchentoot:easy-acceptor
                  :port 8080
                  :address "127.0.0.1"))
+
+(defun sqlite-query (sql)
+  (string-trim '(#\Space #\Tab #\Newline #\Return)
+    (uiop:run-program
+      (list "sqlite3" "-noheader" *db-path* sql)
+      :output :string
+      :error-output :string)))
+
+(defun today-state ()
+  (let* ((result
+           (sqlite-query
+             "INSERT OR IGNORE INTO zikr_sessions (zikr_date, zikr_name, count, target) VALUES (date('now','localtime'), 'Allah Zikr', 0, 1000); SELECT count || '|' || target FROM zikr_sessions WHERE zikr_date = date('now','localtime') AND zikr_name = 'Allah Zikr';"))
+         (separator (position #\| result)))
+    (if separator
+        (values
+          (parse-integer (subseq result 0 separator))
+          (parse-integer (subseq result (1+ separator))))
+        (values 0 1000))))
+
+(hunchentoot:define-easy-handler (api-state :uri "/api/state") ()
+  (setf (hunchentoot:content-type*) "application/json")
+  (multiple-value-bind (count target) (today-state)
+    (format nil "{\"count\":~d,\"target\":~d}" count target)))
+
+(hunchentoot:define-easy-handler (api-save :uri "/api/save")
+    (count target)
+  (setf (hunchentoot:content-type*) "application/json")
+  (let* ((new-count (ignore-errors (parse-integer count)))
+         (new-target (ignore-errors (parse-integer target))))
+    (if (and new-count
+             (<= 0 new-count 1000000000)
+             (member new-target '(33 100 313 1000)))
+        (progn
+          (sqlite-query
+            (format nil
+              "INSERT INTO zikr_sessions (zikr_date, zikr_name, count, target) VALUES (date('now','localtime'), 'Allah Zikr', ~d, ~d) ON CONFLICT(zikr_date, zikr_name) DO UPDATE SET count = excluded.count, target = excluded.target, updated_at = CURRENT_TIMESTAMP;"
+              new-count new-target))
+          "{\"ok\":true}")
+        (progn
+          (setf (hunchentoot:return-code*) 400)
+          "{\"ok\":false}"))))
 
 (hunchentoot:define-easy-handler (home :uri "/") ()
   (setf (hunchentoot:content-type*) "text/html; charset=utf-8")
@@ -27,34 +71,81 @@ progress{width:100%;height:18px;accent-color:#176b48}
 <p>Begin with Bismillah</p>
 <label for='target'>Target: </label>
 <select id='target'>
-<option>33</option><option>100</option><option>313</option><option selected>1000</option>
+<option value='33'>33</option>
+<option value='100'>100</option>
+<option value='313'>313</option>
+<option value='1000' selected>1000</option>
 </select>
 <div class='count' id='count'>0</div>
 <button id='add'>+1 Zikr</button>
 <button id='reset'>Reset</button>
 <progress id='progress' value='0' max='1000'></progress>
-<p id='status'>0 of 1000 completed</p>
-<p>Your count is saved in this browser on this Mac.</p>
+<p id='status'>Loading count...</p>
+<p id='sync'>Connecting to SQLite...</p>
 </main>
 <script>
-let count=Number(localStorage.getItem('zikr-count')||0);
+let count=0;
+let saving=Promise.resolve();
 const target=document.getElementById('target');
-target.value=localStorage.getItem('zikr-target')||'1000';
+
 function render(){
  const goal=Number(target.value);
  document.getElementById('count').textContent=count;
  document.getElementById('progress').max=goal;
  document.getElementById('progress').value=Math.min(count,goal);
- document.getElementById('status').textContent=count+' of '+goal+' completed'+(count>=goal?' — Alhamdulillah!':'');
- localStorage.setItem('zikr-count',String(count));
- localStorage.setItem('zikr-target',String(goal));
+ document.getElementById('status').textContent=
+   count+' of '+goal+' completed'+(count>=goal?' — Alhamdulillah!':'');
 }
-document.getElementById('add').onclick=()=>{count++;render()};
-document.getElementById('reset').onclick=()=>{if(confirm('Reset count to zero?')){count=0;render()}};
-target.onchange=render;
-render();
+
+function persist(){
+ const savedCount=count;
+ const savedTarget=Number(target.value);
+ saving=saving.then(()=>fetch('/api/save',{
+   method:'POST',
+   headers:{'Content-Type':'application/x-www-form-urlencoded'},
+   body:'count='+savedCount+'&target='+savedTarget
+ })).then(response=>{
+   if(!response.ok) throw Error('Save failed');
+   document.getElementById('sync').textContent='Saved in SQLite';
+ }).catch(()=>{
+   document.getElementById('sync').textContent='Save failed — check server';
+ });
+}
+
+document.getElementById('add').onclick=()=>{
+ count++;
+ render();
+ persist();
+};
+
+document.getElementById('reset').onclick=()=>{
+ if(confirm('Reset count to zero?')){
+   count=0;
+   render();
+   persist();
+ }
+};
+
+target.onchange=()=>{
+ render();
+ persist();
+};
+
+fetch('/api/state').then(response=>{
+ if(!response.ok) throw Error('Load failed');
+ return response.json();
+}).then(state=>{
+ count=state.count;
+ target.value=String(state.target);
+ render();
+ document.getElementById('sync').textContent='Loaded from SQLite';
+}).catch(()=>{
+ document.getElementById('status').textContent='Could not load count';
+ document.getElementById('sync').textContent='Check the server and database';
+});
 </script>
-</body></html>")
+</body>
+</html>")
 
 (hunchentoot:start *web-server*)
 (format t "~%Zikr Counter running at http://127.0.0.1:8080~%")
