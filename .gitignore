@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# SQLite databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Common Lisp compiled files
+*.fasl
+*.fas
+*.lib
+*.o
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Editor and temporary files
+*~
+*.swp
+*.tmp
