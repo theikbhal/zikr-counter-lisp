@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Allah Zikr Counter</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 1000px;
+      margin: 24px auto;
+      padding: 16px;
+      background: #f5f5f5;
+      color: #222;
+    }
+    header, .toolbar, .card {
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    input, button, select {
+      font: inherit;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button { cursor: pointer; }
+    .primary {
+      background: #176b45;
+      color: white;
+      border: 0;
+    }
+    #cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    #cards.linear, #cards.vertical {
+      grid-template-columns: 1fr;
+    }
+    #cards.horizontal {
+      display: flex;
+      overflow-x: auto;
+    }
+    #cards.horizontal .card { min-width: 240px; }
+    .card { margin: 0; }
+    .card input { width: 100%; margin-bottom: 8px; }
+    .count { font-size: 36px; font-weight: bold; margin: 10px 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .actions button { flex: 1; }
+    .progress {
+      height: 8px;
+      background: #eee;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .bar { height: 100%; background: #25875c; }
+    small { color: #666; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Allah Zikr Counter</h1>
+    <p>Track your zikr, one count at a time.</p>
+  </header>
+
+  <section class="toolbar">
+    <input id="newName" placeholder="Counter name" maxlength="100">
+    <input id="newGoal" type="number" min="1" value="1000">
+    <button id="add" class="primary">+ Add counter</button>
+
+    <select id="layout">
+      <option value="grid">Grid</option>
+      <option value="linear">Linear</option>
+      <option value="vertical">Vertical</option>
+      <option value="horizontal">Horizontal</option>
+    </select>
+
+    <button id="export">Export JSON</button>
+    <button id="importButton">Import JSON</button>
+    <input id="importFile" type="file" accept=".json,application/json" hidden>
+  </section>
+
+  <p id="status" role="status">Loading counters…</p>
+  <section id="cards" class="grid"></section>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
